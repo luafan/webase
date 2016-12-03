@@ -16,8 +16,9 @@ COPY service /root/service
 COPY web /root/web
 
 COPY *.lua /root/
-COPY cert.pem /root/
 COPY mime.types /root/
+
+RUN curl https://curl.haxx.se/ca/cacert.pem -o cert.pem
 
 VOLUME ["/root/config.d"]
 
