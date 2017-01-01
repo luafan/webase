@@ -1,1 +1,1 @@
-webroot = os.getenv("WEBROOT") or "/root/web"
+webroot = os.getenv("WEBROOT") or "web"
