@@ -13,56 +13,68 @@ local route_map = {
 local pattern_map = {
 }
 
-local function load_path(path)
-  local attr = lfs.attributes(path)
-  if attr and attr.mode == "directory" then
-    for name in lfs.dir(path) do
-      if name:match("^[^.].*[.]lua$") then
-        load_path(string.format("%s/%s", path, name))
-      end
-    end
-  else
-    local m = setmetatable({}, { __index = _G })
-    local ret = loadfile(path, "t", m)()
-    if ret then
-      for k,v in pairs(ret) do
-        m[k] = v
-      end
-    end
+local function load_path(path, parent_path)
+  for name in lfs.dir(path) do
+    if name:sub(1,1) ~= "." then
+      local filepath = path .. "/" .. name
+      local attr = lfs.attributes(filepath)
 
-    local route = m.route or "/" .. path:match("([^/]*)[.]lua$")
-    local pattern = m.pattern
-    if route or pattern then
-      local t = {}
-      if route then
-        route_map[route] = t
-      end
-      if pattern then
-        pattern_map[pattern] = t
-      end
+      if attr and attr.mode == "directory" then
+        load_path(filepath, parent_path .. name .. "/")
+      else
+        local mname = name:match("([^/]*)[.]lua$")
+        if mname then
+          local m = setmetatable({}, { __index = _G })
+          local ret = loadfile(filepath, "t", m)()
+          if ret then
+            for k,v in pairs(ret) do
+              m[k] = v
+            end
+          end
 
-      for k,v in pairs(m) do
-        if string.find(k:lower(), "on", 1, true) == 1 then
-          t[k:sub(3):upper()] = v
+          local route = m.route or parent_path .. mname
+          local pattern = m.pattern
+          if route or pattern then
+            local t = {}
+            if route then
+              route_map[route] = t
+            end
+            if pattern then
+              pattern_map[pattern] = t
+            end
+
+            for k,v in pairs(m) do
+              t[k] = v
+              if string.find(k:lower(), "on", 1, true) == 1 then
+                t[k:sub(3):upper()] = v
+              end
+            end
+          end
         end
       end
     end
   end
 end
 
-load_path("handle")
+load_path("handle", "/")
 
-return {
-  web = function(req, resp)
-    local map = route_map[req.path]
-    if not map then
-      for k,v in pairs(pattern_map) do
-        if req.path:find(k) then
-          map = v
-          break
-        end
+local function find(path)
+  local map = route_map[path]
+  if not map then
+    for k,v in pairs(pattern_map) do
+      if req.path:find(k) then
+        map = v
+        break
       end
     end
+  end
+  return map
+end
+
+return {
+  find = find,
+  web = function(req, resp)
+    local map = find(req.path)
 
     if map then
       local method = req.method
