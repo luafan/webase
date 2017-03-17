@@ -62,7 +62,7 @@ local function find(path)
   local map = route_map[path]
   if not map then
     for k,v in pairs(pattern_map) do
-      if req.path:find(k) then
+      if path:find(k) then
         map = v
         break
       end
