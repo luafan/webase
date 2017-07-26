@@ -1,5 +1,4 @@
 local lru = require "lru"
-local mapping = require "mapping"
 local lfs = require "lfs"
 local md5 = require "md5"
 local mime = require "mime"

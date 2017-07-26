@@ -15,6 +15,7 @@ local httpd = require "fan.httpd"
 
 local route = require "route"
 local utils = require "fan.utils"
+local mapping = require "mapping"
 
 local webfile = require "webfile"
 
@@ -24,6 +25,8 @@ print(service.start())
 math.randomseed(utils.gettime())
 
 function onService(req,resp)
+  req.path = mapping[req.path] or req.path
+
   if not route.web(req, resp) then
     return webfile.web(req, resp)
   end
