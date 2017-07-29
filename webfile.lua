@@ -105,7 +105,7 @@ local function web(req, resp)
             else
                 return resp:reply(400, "Invaild Request", "")
             end
-        else
+        elseif #(v) > 0 then
             table.insert(list, http.unescape and http.unescape(v) or v)
         end
     end
@@ -132,7 +132,8 @@ local function web(req, resp)
             resp:addheader("Content-Type", "text/html; charset=utf-8")
             resp:reply_start(200, "OK")
 
-            local parentpath = #(list) > 1 and list[#(list)] or ""
+            list[1] = ""
+            local parentpath = table.concat(list, "/")
 
             for file in lfs.dir(path) do
                 if string.sub(file, 1, 1) ~= "." then
