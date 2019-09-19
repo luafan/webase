@@ -2,7 +2,7 @@ local stream = require "fan.stream"
 local print = print
 local pcall = pcall
 local require = require
-local json = require "cjson"
+local cjson = require "cjson"
 local string = string
 
 local lfs = require "lfs"
@@ -71,6 +71,28 @@ local function find(path)
   return map
 end
 
+local respMap = {
+  ["table"] = function(req, resp, data)
+    local body = cjson.encode(data)
+
+    if req.params.jsonp then
+      resp:addheader("Content-Type", "text/javascript; charset=UTF-8")
+      resp:reply(200, "OK", string.format("%s(%s)", req.params.jsonp, body))
+    else
+      resp:addheader("Content-Type", "application/json; charset=UTF-8")
+      resp:reply(200, "OK", body)
+    end
+  end,
+  ["string"] = function(req, resp, data)
+    if string.sub(data, 1, 1) == "<" then
+      resp:addheader("Content-Type", "text/html; charset=UTF-8")
+    else
+      resp:addheader("Content-Type", "text/plain; charset=UTF-8")
+    end
+    resp:reply(200, "OK", data)
+  end,
+}
+
 return {
   find = find,
   web = function(req, resp)
@@ -84,8 +106,18 @@ return {
 
         if st == false then
           print("[route]", msg)
-          local exception = json.encode{exception=msg}
+          local exception = cjson.encode{exception=msg}
           resp:reply(500, "OK", exception)
+        elseif msg then
+          local m = respMap[type(msg)]
+          if m then
+            local st,msg2 = pcall(m, req, resp, msg)
+            if not st then
+              print("[route]", msg2)
+              local exception = cjson.encode{exception=msg2}
+              resp:reply(500, "OK", exception)
+            end
+          end
         end
 
         return true

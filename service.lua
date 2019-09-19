@@ -21,16 +21,26 @@ local function load_path(path)
       end
     else
       local m = setmetatable({}, { __index = _G })
-      loadfile(path, "t", m)()
+      local func,msg = loadfile(path, "t", m)
+      if not func then
+        print(msg)
+      else
+        func()
+      end
 
       m.name = m.name or path:match("([^/]*)[.]lua$")
       if m.name then
         service_map[m.name] = m
 
+        local tmp = {}
         for k,v in pairs(m) do
           if string.find(k:lower(), "on", 1, true) == 1 then
-            m[k:sub(3):lower()] = v
+            tmp[k:sub(3):lower()] = v
           end
+        end
+
+        for k,v in pairs(tmp) do
+          m[k] = v
         end
       end
     end
@@ -44,7 +54,7 @@ local function eval(method, name, ...)
     if service_map[name] and service_map[name][method] then
       return pcall(service_map[name][method], ...)
     else
-      return false, "not found"
+      return false, string.format("[%s.%s] not found", name, method)
     end
   else
     for k,v in pairs(service_map) do
@@ -54,7 +64,10 @@ local function eval(method, name, ...)
           return st, msg
         end
       else
-        return false, "not found"
+        for k,v in pairs(v) do
+          print(k,v)
+        end
+        return false, string.format("[%s] not found", method)
       end
     end
 

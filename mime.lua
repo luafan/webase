@@ -22,7 +22,7 @@ local function split(str, pat)
   return t
 end
 
-local f = io.open("mime.types", "r")
+local f = io.open(serviceRoot .. "mime.types", "r")
 while true do
   local line = f:read("*line")
   if line then
@@ -37,11 +37,7 @@ while true do
       end
 
       for i=#(out),2,-1 do
-        if out[i] == "txt" then
-          map[out[i]] = string.format("%s; charset=utf-8", out[1])
-        else
-          map[out[i]] = out[1]
-        end
+        map[out[i]] = out[1]
       end
     end
   else
