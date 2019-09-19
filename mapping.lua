@@ -1,6 +1,6 @@
 local lfs = require "lfs"
 
-local mapping_dir = serviceRoot .. "mapping"
+local mapping_dir = "mapping"
 
 local env = {os = os, tonumber = tonumber}
 env._ENV = env
