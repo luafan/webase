@@ -18,7 +18,7 @@ COPY web /root/web
 COPY *.lua /root/
 COPY mime.types /root/
 
-RUN curl https://curl.haxx.se/ca/cacert.pem -o cert.pem
+RUN wget https://curl.haxx.se/ca/cacert.pem -O cert.pem
 
 VOLUME ["/root/config.d"]
 
