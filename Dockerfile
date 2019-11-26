@@ -1,4 +1,4 @@
-FROM luafan/luafan-ubuntu
+FROM luafan/luafan-alpine
 
 ENV MARIA_DATABASE_NAME test
 
