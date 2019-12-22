@@ -24,4 +24,4 @@ VOLUME ["/root/config.d"]
 
 WORKDIR /root/
 
-ENTRYPOINT ["luajit", "core.lua"]
+ENTRYPOINT ["lua", "core.lua"]
