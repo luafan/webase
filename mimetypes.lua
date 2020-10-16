@@ -35,7 +35,8 @@ while true do
           table.insert(out, v)
         end
       end
-
+      
+      --     video/mpeg                            mpeg mpg;
       for i=#(out),2,-1 do
         if out[i] == "txt" then
           map[out[i]] = string.format("%s; charset=utf-8", out[1])

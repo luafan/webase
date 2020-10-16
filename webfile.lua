@@ -1,7 +1,7 @@
 local lru = require "lru"
 local lfs = require "lfs"
 local md5 = require "md5"
-local mime = require "mime"
+local mimetypes = require "mimetypes"
 local config = require "config"
 local http = require "fan.http"
 local zlib = require "zlib"
@@ -118,8 +118,8 @@ local function web(req, resp)
         local etag = get_file_etag(file_info)
         if etag == if_none_match then
             local ext = path:match("([^.]+)$")
-            if mime[ext] then
-                resp:addheader("Content-Type", mime[ext])
+            if mimetypes[ext] then
+                resp:addheader("Content-Type", mimetypes[ext])
             end
         
             return resp:reply(304, "Not Modified", "")
@@ -157,8 +157,8 @@ local function web(req, resp)
             local body = get_file_body(file_info)
             if body then
                 local ext = path:match("([^.]+)$")
-                if mime[ext] then
-                    resp:addheader("Content-Type", mime[ext])
+                if mimetypes[ext] then
+                    resp:addheader("Content-Type", mimetypes[ext])
                 end
 
                 local accept = req.headers["Accept-Encoding"]
