@@ -71,11 +71,20 @@ local function find(path)
   return map
 end
 
+local function is_valid_jsonp_callback(name)
+  return name and name:match("^[%a_$][%w_$.]*$") ~= nil and #name <= 128
+end
+
 local respMap = {
   ["table"] = function(req, resp, data)
     local body = cjson.encode(data)
 
     if req.params.jsonp then
+      if not is_valid_jsonp_callback(req.params.jsonp) then
+        resp:addheader("Content-Type", "application/json; charset=UTF-8")
+        resp:reply(400, "Bad Request", cjson.encode({error = "invalid callback name"}))
+        return
+      end
       resp:addheader("Content-Type", "text/javascript; charset=UTF-8")
       resp:reply(200, "OK", string.format("%s(%s)", req.params.jsonp, body))
     else

@@ -10,6 +10,8 @@ ENV HTTPD_USING_CORE true
 
 ENV WEBROOT /root/web
 
+RUN wget https://curl.haxx.se/ca/cacert.pem -O cert.pem
+
 COPY config /root/config
 COPY handle /root/handle
 COPY service /root/service
@@ -17,8 +19,6 @@ COPY web /root/web
 
 COPY *.lua /root/
 COPY mime.types /root/
-
-RUN wget https://curl.haxx.se/ca/cacert.pem -O cert.pem
 
 VOLUME ["/root/config.d"]
 

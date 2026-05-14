@@ -2,7 +2,14 @@ local lfs = require "lfs"
 
 local mapping_dir = "mapping"
 
-local env = {os = os, tonumber = tonumber}
+local safe_os = {
+    getenv = os.getenv,
+    time = os.time,
+    date = os.date,
+    clock = os.clock,
+    difftime = os.difftime,
+}
+local env = {os = safe_os, tonumber = tonumber, tostring = tostring}
 env._ENV = env
 env._G = env
 

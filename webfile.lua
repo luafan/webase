@@ -10,6 +10,10 @@ local file_cache
 local body_cache
 local gzip_cache
 
+local function html_escape(str)
+    return str:gsub("&", "&amp;"):gsub("<", "&lt;"):gsub(">", "&gt;"):gsub('"', "&quot;"):gsub("'", "&#39;")
+end
+
 local function reset_cache()
     file_cache = lru.new(1024, 1024 * 100)
     body_cache = lru.new(1024, 1024 * 100 * 1024)
@@ -95,22 +99,49 @@ local function get_file_etag(file_info)
     return file_info.etag
 end
 
+local function is_within_webroot(path, webroot)
+    if path:sub(1, #webroot) ~= webroot then
+        return false
+    end
+    local next_char = path:sub(#webroot + 1, #webroot + 1)
+    return next_char == "" or next_char == "/"
+end
+
+local function url_decode(str)
+    return str:gsub("%%(%x%x)", function(hex)
+        return string.char(tonumber(hex, 16))
+    end)
+end
+
 local function web(req, resp)
     local parts = split(req.path, "/")
     local list = {config.webroot}
     for i, v in ipairs(parts) do
-        if v == ".." then
+        local decoded = url_decode(v)
+        if decoded:find("\0") then
+            return resp:reply(400, "Invalid Request", "")
+        end
+        if decoded:find("/") then
+            return resp:reply(400, "Invalid Request", "")
+        end
+        if decoded == ".." then
             if #(list) > 1 then
                 table.remove(list)
             else
-                return resp:reply(400, "Invaild Request", "")
+                return resp:reply(400, "Invalid Request", "")
             end
-        elseif #(v) > 0 then
-            table.insert(list, http.unescape and http.unescape(v) or v)
+        elseif decoded == "." then
+            -- skip
+        elseif #(decoded) > 0 then
+            table.insert(list, decoded)
         end
     end
 
     local path = table.concat(list, "/")
+
+    if not is_within_webroot(path, config.webroot) then
+        return resp:reply(403, "Forbidden", "")
+    end
 
     local file_info = get_file_info(path)
     local if_none_match = req.headers["If-None-Match"]
@@ -139,14 +170,16 @@ local function web(req, resp)
                 if string.sub(file, 1, 1) ~= "." then
                     local f = path .. "/" .. file
                     local item_info = get_file_info(f)
+                    local safe_name = html_escape(file)
+                    local safe_href = html_escape(parentpath .. "/" .. file)
 
                     if item_info.attr.mode == "directory" then
                         resp:reply_chunk(
-                            string.format([[<a href="%s/%s">[%s]</a><br/>]], parentpath, file, file)
+                            string.format([[<a href="%s">[%s]</a><br/>]], safe_href, safe_name)
                         )
                     else
                         resp:reply_chunk(
-                            string.format([[<a href="%s/%s">%s</a><br/>]], parentpath, file, file)
+                            string.format([[<a href="%s">%s</a><br/>]], safe_href, safe_name)
                         )
                     end
                 end
