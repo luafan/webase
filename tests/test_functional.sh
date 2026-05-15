@@ -160,6 +160,50 @@ else
     fail "CSS file served with correct MIME type" "got: $css_ctype"
 fi
 
+# --- Dynamic Route ---
+
+echo ""
+echo "-- Dynamic Route --"
+
+# Exact dynamic route
+dr_resp=$(curl -s -w "\n%{http_code}" "$BASE_URL/dynamic_test")
+dr_code=$(echo "$dr_resp" | tail -1)
+dr_body=$(echo "$dr_resp" | sed '$d')
+if [ "$dr_code" = "200" ]; then
+    pass "GET /dynamic_test returns 200"
+else
+    fail "GET /dynamic_test returns 200" "got $dr_code"
+fi
+if echo "$dr_body" | grep -q '"dynamic":true'; then
+    pass "Dynamic route returns expected JSON"
+else
+    fail "Dynamic route returns expected JSON" "body: $dr_body"
+fi
+
+# Pattern dynamic route
+dp_resp=$(curl -s -w "\n%{http_code}" "$BASE_URL/dynamic_pattern/foo")
+dp_code=$(echo "$dp_resp" | tail -1)
+dp_body=$(echo "$dp_resp" | sed '$d')
+if [ "$dp_code" = "200" ]; then
+    pass "GET /dynamic_pattern/foo returns 200"
+else
+    fail "GET /dynamic_pattern/foo returns 200" "got $dp_code"
+fi
+if echo "$dp_body" | grep -q '"dynamic":true'; then
+    pass "Dynamic pattern route returns expected JSON"
+else
+    fail "Dynamic pattern route returns expected JSON" "body: $dp_body"
+fi
+
+# Static route takes priority over dynamic
+# /echo is defined in handle/, should still work even if a dynamic route could match
+echo_resp=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL/echo")
+if [ "$echo_resp" = "200" ]; then
+    pass "Static route /echo still takes priority"
+else
+    fail "Static route /echo still takes priority" "got $echo_resp"
+fi
+
 # --- Summary ---
 
 echo ""

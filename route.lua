@@ -13,7 +13,15 @@ local route_map = {
 local pattern_map = {
 }
 
+local dynamic_route_map = {
+}
+
+local dynamic_pattern_map = {
+}
+
 local function load_path(path, parent_path)
+  local attr = lfs.attributes(path)
+  if not attr or attr.mode ~= "directory" then return end
   for name in lfs.dir(path) do
     if name:sub(1,1) ~= "." then
       local filepath = path .. "/" .. name
@@ -60,15 +68,45 @@ load_path("handle", "/")
 
 local function find(path)
   local map = route_map[path]
-  if not map then
-    for k,v in pairs(pattern_map) do
-      if path:find(k) then
-        map = v
-        break
-      end
+  if map then return map end
+
+  for k,v in pairs(pattern_map) do
+    if path:find(k) then return v end
+  end
+
+  map = dynamic_route_map[path]
+  if map then return map end
+
+  for k,v in pairs(dynamic_pattern_map) do
+    if path:find(k) then return v end
+  end
+
+  return nil
+end
+
+local function add(opts)
+  local route_path = opts.route
+  local pat = opts.pattern
+
+  local t = {}
+  for k,v in pairs(opts) do
+    t[k] = v
+    if string.find(k:lower(), "on", 1, true) == 1 then
+      t[k:sub(3):upper()] = v
     end
   end
-  return map
+
+  if route_path then
+    dynamic_route_map[route_path] = t
+  end
+  if pat then
+    dynamic_pattern_map[pat] = t
+  end
+end
+
+local function remove(path_or_pattern)
+  dynamic_route_map[path_or_pattern] = nil
+  dynamic_pattern_map[path_or_pattern] = nil
 end
 
 local function is_valid_jsonp_callback(name)
@@ -104,6 +142,8 @@ local respMap = {
 
 return {
   find = find,
+  add = add,
+  remove = remove,
   web = function(req, resp)
     local map = find(req.path)
 

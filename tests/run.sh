@@ -36,6 +36,8 @@ docker run -d \
     --name "$CONTAINER_NAME" \
     -p "0:$CONTAINER_PORT" \
     -e "PURGE_TOKEN=$PURGE_TOKEN" \
+    -v "$SCRIPT_DIR/fixtures/handle:/root/handle:ro" \
+    -v "$SCRIPT_DIR/fixtures/service:/root/service:ro" \
     "$IMAGE_NAME" >/dev/null
 
 HOST_PORT=$(docker port "$CONTAINER_NAME" "$CONTAINER_PORT" | head -1 | cut -d: -f2)
