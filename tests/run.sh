@@ -27,7 +27,7 @@ cleanup() {
 trap cleanup EXIT
 
 echo "=== Building Docker Image ==="
-docker build -t "$IMAGE_NAME" "$PROJECT_DIR"
+docker build --network=host -t "$IMAGE_NAME" "$PROJECT_DIR"
 echo "  Image built: $IMAGE_NAME"
 
 echo ""
@@ -75,7 +75,7 @@ run_suite() {
     local name="$2"
     echo ""
     set +e
-    BASE_URL="$BASE_URL" PURGE_TOKEN="$PURGE_TOKEN" bash "$script"
+    BASE_URL="$BASE_URL" PURGE_TOKEN="$PURGE_TOKEN" CONTAINER_NAME="$CONTAINER_NAME" bash "$script"
     local failures=$?
     set -e
 
@@ -89,6 +89,7 @@ run_suite() {
 
 run_suite "$SCRIPT_DIR/test_functional.sh" "Functional"
 run_suite "$SCRIPT_DIR/test_security.sh" "Security"
+run_suite "$SCRIPT_DIR/test_websocket.sh" "WebSocket"
 
 echo ""
 echo "==============================="

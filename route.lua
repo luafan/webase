@@ -148,6 +148,15 @@ return {
     local map = find(req.path)
 
     if map then
+      if map["WEBSOCKET"] and req:is_websocket_upgrade() then
+        local m = map["WEBSOCKET"]
+        local st, msg = pcall(m, req, resp)
+        if not st then
+          print("[route][ws]", msg)
+        end
+        return true
+      end
+
       local method = req.method
       local m = map[method]
       if m then
