@@ -23,9 +23,12 @@ local function load_path(path)
       local m = setmetatable({}, { __index = _G })
       local func,msg = loadfile(path, "t", m)
       if not func then
-        print(msg)
+        print("[service] load error: " .. path .. ": " .. tostring(msg))
       else
-        func()
+        local ok, err = pcall(func)
+        if not ok then
+          print("[service] exec error: " .. path .. ": " .. tostring(err))
+        end
       end
 
       m.name = m.name or path:match("([^/]*)[.]lua$")

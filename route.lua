@@ -33,28 +33,37 @@ local function load_path(path, parent_path)
         local mname = name:match("([^/]*)[.]lua$")
         if mname then
           local m = setmetatable({}, { __index = _G })
-          local ret = loadfile(filepath, "t", m)()
-          if ret then
-            for k,v in pairs(ret) do
-              m[k] = v
-            end
-          end
+          local chunk, load_err = loadfile(filepath, "t", m)
+          if not chunk then
+            print("[route] load error: " .. filepath .. ": " .. tostring(load_err))
+          else
+            local ok, ret = pcall(chunk)
+            if not ok then
+              print("[route] exec error: " .. filepath .. ": " .. tostring(ret))
+            else
+              if ret then
+                for k,v in pairs(ret) do
+                  m[k] = v
+                end
+              end
 
-          local route = m.route or parent_path .. mname
-          local pattern = m.pattern
-          if route or pattern then
-            local t = {}
-            if route then
-              route_map[route] = t
-            end
-            if pattern then
-              pattern_map[pattern] = t
-            end
+              local route = m.route or parent_path .. mname
+              local pattern = m.pattern
+              if route or pattern then
+                local t = {}
+                if route then
+                  route_map[route] = t
+                end
+                if pattern then
+                  pattern_map[pattern] = t
+                end
 
-            for k,v in pairs(m) do
-              t[k] = v
-              if string.find(k:lower(), "on", 1, true) == 1 then
-                t[k:sub(3):upper()] = v
+                for k,v in pairs(m) do
+                  t[k] = v
+                  if string.find(k:lower(), "on", 1, true) == 1 then
+                    t[k:sub(3):upper()] = v
+                  end
+                end
               end
             end
           end

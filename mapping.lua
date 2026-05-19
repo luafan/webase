@@ -18,7 +18,16 @@ local function load_config(dir)
     if attr and attr.mode == "directory" then
         for name in lfs.dir(dir) do
             if name:match("^[^.].*[.]dll$") then
-                loadfile(string.format("%s/%s", dir, name), "t", env)()
+                local filepath = string.format("%s/%s", dir, name)
+                local chunk, load_err = loadfile(filepath, "t", env)
+                if not chunk then
+                    print("[mapping] load error: " .. filepath .. ": " .. tostring(load_err))
+                else
+                    local ok, exec_err = pcall(chunk)
+                    if not ok then
+                        print("[mapping] exec error: " .. filepath .. ": " .. tostring(exec_err))
+                    end
+                end
             end
         end
     else
