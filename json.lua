@@ -33,15 +33,22 @@ local encode
 local getmetatable = getmetatable
 local setmetatable = setmetatable
 
-local table_object_mt = {}
+local fan = require "fan"
+
 local table_array_mt = {}
+local table_object_mt = {}
 
--- Sentinel values for explicitly empty array/object/null
-json.empty_array = setmetatable({}, table_array_mt)
-json.empty_object = setmetatable({}, table_object_mt)
+json.null = fan.const("json.null")
+json.empty_array = fan.const("json.empty_array")
+json.empty_object = fan.const("json.empty_object")
 
-local json_null_mt = {}
-json.null = setmetatable({}, json_null_mt)
+function json.array(t)
+  return setmetatable(t or {}, table_array_mt)
+end
+
+function json.object(t)
+  return setmetatable(t or {}, table_object_mt)
+end
 
 local escape_char_map = {
   ["\\"] = "\\",
@@ -73,17 +80,13 @@ local function encode_table(val, stack)
   local res = {}
   stack = stack or {}
 
-  -- Handle sentinel empty values
-  if val == json.empty_array then return "[]" end
-  if val == json.empty_object then return "{}" end
-  if val == json.null then return "null" end
-
   -- Circular reference?
   if stack[val] then error("circular reference") end
 
   stack[val] = true
+  local mt = getmetatable(val)
 
-  if rawget(val, 1) ~= nil or getmetatable(val) == table_array_mt then
+  if rawget(val, 1) ~= nil or mt == table_array_mt then
     -- Treat as array -- check keys are valid and it is not sparse
     local n = 0
     for k in pairs(val) do
@@ -137,8 +140,15 @@ local type_func_map = {
   ["boolean"] = tostring,
 }
 
+local const_encode_map = {
+  [json.null] = "null",
+  [json.empty_array] = "[]",
+  [json.empty_object] = "{}",
+}
 
 encode = function(val, stack)
+  local cm = const_encode_map[val]
+  if cm then return cm end
   local t = type(val)
   local f = type_func_map[t]
   if f then
