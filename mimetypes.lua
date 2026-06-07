@@ -37,8 +37,9 @@ while true do
       end
       
       --     video/mpeg                            mpeg mpg;
+      local is_text = out[1]:match("^text/") or out[1]:match("^application/javascript") or out[1]:match("^application/json") or out[1]:match("^application/xml")
       for i=#(out),2,-1 do
-        if out[i] == "txt" then
+        if is_text then
           map[out[i]] = string.format("%s; charset=utf-8", out[1])
         else
           map[out[i]] = out[1]
