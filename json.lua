@@ -86,7 +86,7 @@ local function encode_table(val, stack)
   stack[val] = true
   local mt = getmetatable(val)
 
-  if rawget(val, 1) ~= nil or mt == table_array_mt then
+  if rawget(val, 1) ~= nil or mt == table_array_mt or (mt ~= table_object_mt and next(val) == nil) then
     -- Treat as array -- check keys are valid and it is not sparse
     local n = 0
     for k in pairs(val) do
