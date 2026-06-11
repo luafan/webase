@@ -208,8 +208,7 @@ local function decode_error(str, idx, msg)
       col_count = 1
     end
   end
-  require("fan.log").error(debug.traceback())
-  error(string.format("%s at line %d col %d", msg, line_count, col_count))
+  error(string.format("%s at line %d col %d\n%s", msg, line_count, col_count, debug.traceback()))
 end
 
 
