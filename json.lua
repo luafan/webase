@@ -38,9 +38,8 @@ local fan = require "fan"
 local table_array_mt = {}
 local table_object_mt = {}
 
-json.null = fan.const("json.null")
-json.empty_array = fan.const("json.empty_array")
-json.empty_object = fan.const("json.empty_object")
+local NULL_SENTINEL = fan.const("json.null")
+json.null = nil
 
 function json.array(t)
   return setmetatable(t or {}, table_array_mt)
@@ -141,9 +140,7 @@ local type_func_map = {
 }
 
 local const_encode_map = {
-  [json.null] = "null",
-  [json.empty_array] = "[]",
-  [json.empty_object] = "{}",
+  [NULL_SENTINEL] = "null",
 }
 
 encode = function(val, stack)
@@ -184,7 +181,6 @@ local literals     = create_set("true", "false", "null")
 local literal_map  = {
   ["true"] = true,
   ["false"] = false,
-  ["null"] = json.null,
 }
 
 
@@ -297,6 +293,9 @@ local function parse_literal(str, i)
   if not literals[word] then
     decode_error(str, i, "invalid literal '" .. word .. "'")
   end
+  if word == "null" then
+    return json.null, x
+  end
   return literal_map[word], x
 end
 
@@ -408,6 +407,14 @@ function json.decode(str)
     decode_error(str, idx, "trailing garbage")
   end
   return res
+end
+
+function json.enable_null(enabled)
+  if enabled then
+    json.null = NULL_SENTINEL
+  else
+    json.null = nil
+  end
 end
 
 return json
