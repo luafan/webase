@@ -2,10 +2,13 @@ local stream = require "fan.stream"
 local print = print
 local pcall = pcall
 local require = require
-local cjson = require "cjson"
+local cjson = require "json"
 local string = string
 
 local lfs = require "lfs"
+
+local MODULE_EXT = MODULE_EXT or ".lua"
+local MODULE_LOAD_MODE = MODULE_LOAD_MODE or "bt"
 
 local route_map = {
 }
@@ -30,10 +33,10 @@ local function load_path(path, parent_path)
       if attr and attr.mode == "directory" then
         load_path(filepath, parent_path .. name .. "/")
       else
-        local mname = name:match("([^/]*)[.]lua$")
+        local mname = name:match("([^/]+)" .. MODULE_EXT:gsub("%.","%%.") .. "$")
         if mname then
           local m = setmetatable({}, { __index = _G })
-          local chunk, load_err = loadfile(filepath, "t", m)
+          local chunk, load_err = loadfile(filepath, MODULE_LOAD_MODE, m)
           if not chunk then
             print("[route] load error: " .. filepath .. ": " .. tostring(load_err))
           else
@@ -73,7 +76,48 @@ local function load_path(path, parent_path)
   end
 end
 
-load_path("handle", "/")
+local function register_handle(m)
+  local route = m.route
+  local pattern = m.pattern
+  if route or pattern then
+    local t = {}
+    if route then
+      route_map[route] = t
+    end
+    if pattern then
+      pattern_map[pattern] = t
+    end
+    for k,v in pairs(m) do
+      t[k] = v
+      if string.find(k:lower(), "on", 1, true) == 1 then
+        t[k:sub(3):upper()] = v
+      end
+    end
+  end
+end
+
+if _HANDLE_REGISTRY then
+  -- 从 amalgamated bundle 加载 handle 模块 (字节码 + 独立 env)
+  for modname, bytecode in pairs(_HANDLE_REGISTRY) do
+    local m = setmetatable({}, { __index = _G })
+    local chunk, load_err = load(bytecode, "@" .. modname, "b", m)
+    if not chunk then
+      print("[route] bundle load error: " .. modname .. ": " .. tostring(load_err))
+    else
+      local ok, ret = pcall(chunk)
+      if not ok then
+        print("[route] bundle exec error: " .. modname .. ": " .. tostring(ret))
+      else
+        if ret then
+          for k,v in pairs(ret) do m[k] = v end
+        end
+        register_handle(m)
+      end
+    end
+  end
+else
+  load_path((WORKDIR or "") .. "handle", "/")
+end
 
 local function find(path)
   local map = route_map[path]

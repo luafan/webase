@@ -2,10 +2,13 @@ local stream = require "fan.stream"
 local print = print
 local pcall = pcall
 local require = require
-local json = require "cjson"
+local json = require "json"
 local string = string
 
 local lfs = require "lfs"
+
+local MODULE_EXT = MODULE_EXT or ".lua"
+local MODULE_LOAD_MODE = MODULE_LOAD_MODE or "bt"
 
 local service_map = {
 }
@@ -15,13 +18,13 @@ local function load_path(path)
   if attr then
     if attr.mode == "directory" then
       for name in lfs.dir(path) do
-        if name:match("^[^.].*[.]lua$") then
+        if name:sub(1,1) ~= "." and name:sub(-#MODULE_EXT) == MODULE_EXT then
           load_path(string.format("%s/%s", path, name))
         end
       end
     else
       local m = setmetatable({}, { __index = _G })
-      local func,msg = loadfile(path, "t", m)
+      local func,msg = loadfile(path, MODULE_LOAD_MODE, m)
       if not func then
         print("[service] load error: " .. path .. ": " .. tostring(msg))
       else
@@ -31,7 +34,7 @@ local function load_path(path)
         end
       end
 
-      m.name = m.name or path:match("([^/]*)[.]lua$")
+      m.name = m.name or path:match("([^/]+)" .. MODULE_EXT:gsub("%.","%%.") .. "$")
       if m.name then
         service_map[m.name] = m
 
@@ -50,7 +53,36 @@ local function load_path(path)
   end
 end
 
-load_path("service")
+if _SERVICE_REGISTRY then
+  -- 从 amalgamated bundle 加载 service 模块 (字节码 + 独立 env)
+  for modname, bytecode in pairs(_SERVICE_REGISTRY) do
+    local m = setmetatable({}, { __index = _G })
+    local chunk, load_err = load(bytecode, "@" .. modname, "b", m)
+    if not chunk then
+      print("[service] bundle load error: " .. modname .. ": " .. tostring(load_err))
+    else
+      local ok, err = pcall(chunk)
+      if not ok then
+        print("[service] bundle exec error: " .. modname .. ": " .. tostring(err))
+      end
+    end
+    m.name = m.name or modname:match("([^%.]+)$")
+    if m.name then
+      service_map[m.name] = m
+      local tmp = {}
+      for k,v in pairs(m) do
+        if string.find(k:lower(), "on", 1, true) == 1 then
+          tmp[k:sub(3):lower()] = v
+        end
+      end
+      for k,v in pairs(tmp) do
+        m[k] = v
+      end
+    end
+  end
+else
+  load_path((WORKDIR or "") .. "service")
+end
 
 local function eval(method, name, ...)
   if name then
