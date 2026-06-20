@@ -2,7 +2,7 @@ local stream = require "fan.stream"
 local print = print
 local pcall = pcall
 local require = require
-local cjson = require "json"
+local json = require "json"
 local string = string
 
 local lfs = require "lfs"
@@ -168,12 +168,12 @@ end
 
 local respMap = {
   ["table"] = function(req, resp, data)
-    local body = cjson.encode(data)
+    local body = json.encode(data)
 
     if req.params.jsonp then
       if not is_valid_jsonp_callback(req.params.jsonp) then
         resp:addheader("Content-Type", "application/json; charset=UTF-8")
-        resp:reply(400, "Bad Request", cjson.encode({error = "invalid callback name"}))
+        resp:reply(400, "Bad Request", json.encode({error = "invalid callback name"}))
         return
       end
       resp:addheader("Content-Type", "text/javascript; charset=UTF-8")
@@ -217,7 +217,7 @@ return {
 
         if st == false then
           print("[route]", msg)
-          local exception = cjson.encode{exception=msg}
+          local exception = json.encode{exception=msg}
           resp:reply(500, "OK", exception)
         elseif msg then
           local m = respMap[type(msg)]
@@ -225,7 +225,7 @@ return {
             local st,msg2 = pcall(m, req, resp, msg)
             if not st then
               print("[route]", msg2)
-              local exception = cjson.encode{exception=msg2}
+              local exception = json.encode{exception=msg2}
               resp:reply(500, "OK", exception)
             end
           end
