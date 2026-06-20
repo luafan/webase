@@ -159,34 +159,47 @@ local function web(req, resp)
 
     if file_info.attr then
         if file_info.attr.mode == "directory" then
-            -- list file
-            resp:addheader("Content-Type", "text/html; charset=utf-8")
-            resp:reply_start(200, "OK")
+            -- 先尝试 index page
+            local index_name = config.directory_index or "index.html"
+            local index_path = path .. "/" .. index_name
+            local index_info = get_file_info(index_path)
+            if index_info and index_info.attr and index_info.attr.mode == "file" then
+                path = index_path
+                file_info = index_info
+                -- fall through 到下面的文件 serve 逻辑
+            else
+                -- list directory
+                resp:addheader("Content-Type", "text/html; charset=utf-8")
+                resp:reply_start(200, "OK")
 
-            list[1] = ""
-            local parentpath = table.concat(list, "/")
+                list[1] = ""
+                local parentpath = table.concat(list, "/")
 
-            for file in lfs.dir(path) do
-                if string.sub(file, 1, 1) ~= "." then
-                    local f = path .. "/" .. file
-                    local item_info = get_file_info(f)
-                    local safe_name = html_escape(file)
-                    local safe_href = html_escape(parentpath .. "/" .. file)
+                for file in lfs.dir(path) do
+                    if string.sub(file, 1, 1) ~= "." then
+                        local f = path .. "/" .. file
+                        local item_info = get_file_info(f)
+                        local safe_name = html_escape(file)
+                        local safe_href = html_escape(parentpath .. "/" .. file)
 
-                    if item_info.attr.mode == "directory" then
-                        resp:reply_chunk(
-                            string.format([[<a href="%s">[%s]</a><br/>]], safe_href, safe_name)
-                        )
-                    else
-                        resp:reply_chunk(
-                            string.format([[<a href="%s">%s</a><br/>]], safe_href, safe_name)
-                        )
+                        if item_info.attr.mode == "directory" then
+                            resp:reply_chunk(
+                                string.format([[<a href="%s">[%s]</a><br/>]], safe_href, safe_name)
+                            )
+                        else
+                            resp:reply_chunk(
+                                string.format([[<a href="%s">%s</a><br/>]], safe_href, safe_name)
+                            )
+                        end
                     end
                 end
-            end
 
-            return resp:reply_end()
-        else
+                return resp:reply_end()
+            end
+        end
+
+        -- serve file (regular file or resolved index.html)
+        if file_info.attr.mode ~= "directory" then
             local body = get_file_body(file_info)
             if body then
                 local ext = path:match("([^.]+)$")

@@ -1,5 +1,3 @@
-require "compat53"
-
 print("core.lua")
 
 _S = {conn_count = 0}

@@ -22,7 +22,8 @@ local function split(str, pat)
   return t
 end
 
-local f = io.open("mime.types", "r")
+local mime_types_path = (WORKDIR or "") .. "mime.types"
+local f = io.open(mime_types_path, "r")
 while true do
   local line = f:read("*line")
   if line then
