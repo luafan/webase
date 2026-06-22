@@ -86,6 +86,26 @@ local function encode_table(val, stack)
   local mt = getmetatable(val)
 
   if rawget(val, 1) ~= nil or mt == table_array_mt or (mt ~= table_object_mt and next(val) == nil) then
+    -- Warn on ambiguous empty table (no metatable, no entries). Defaulting
+    -- to [] surprises callers building JSON objects; use json.array() or
+    -- json.object() at the call site to make intent explicit.
+    if mt ~= table_array_mt and mt ~= table_object_mt and next(val) == nil then
+      -- Walk up the stack to find the first frame outside this file. That's
+      -- the user's json.encode() call site. debug.traceback() alone is
+      -- unhelpful because amalgamated builds strip line info from service
+      -- bytecode, so the trace collapses into _amalgamated.lua line numbers.
+      local site = "?"
+      local self_src = debug.getinfo(1, "S").short_src
+      for level = 2, 20 do
+        local info = debug.getinfo(level, "Sl")
+        if not info then break end
+        if info.short_src ~= self_src then
+          site = info.short_src .. ":" .. tostring(info.currentline)
+          break
+        end
+      end
+      print("[json.encode] ambiguous empty table at " .. site .. " — defaulting to []; use json.array()/json.object() to silence")
+    end
     -- Treat as array -- check keys are valid and it is not sparse
     local n = 0
     for k in pairs(val) do
