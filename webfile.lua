@@ -145,7 +145,7 @@ local function web(req, resp)
 
     local file_info = get_file_info(path)
     local if_none_match = req.headers["If-None-Match"]
-    if file_info and if_none_match then
+    if file_info and file_info.attr and file_info.attr.mode ~= "directory" and if_none_match then
         local etag = get_file_etag(file_info)
         if etag == if_none_match then
             local ext = path:match("([^.]+)$")
