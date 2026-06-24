@@ -216,7 +216,7 @@ return {
         local st,msg = pcall(m, req, resp)
 
         if st == false then
-          print("[route]", msg)
+          print("[route]", method, req.path, msg)
           local exception = json.encode{exception=msg}
           resp:reply(500, "OK", exception)
         elseif msg then
@@ -224,7 +224,7 @@ return {
           if m then
             local st,msg2 = pcall(m, req, resp, msg)
             if not st then
-              print("[route]", msg2)
+              print("[route]", method, req.path, msg2)
               local exception = json.encode{exception=msg2}
               resp:reply(500, "OK", exception)
             end
