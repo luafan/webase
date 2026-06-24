@@ -12,7 +12,7 @@ ENV WEBROOT=/root/web
 
 RUN cp /etc/ssl/certs/ca-certificates.crt cert.pem || touch cert.pem
 
-COPY config /root/config
+COPY config.d /root/config.d
 COPY web /root/web
 
 COPY *.lua /root/

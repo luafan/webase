@@ -12,7 +12,7 @@ ENV WEBROOT=/root/web
 
 RUN wget https://curl.haxx.se/ca/cacert.pem -O cert.pem
 
-COPY config /root/config
+COPY config.d /root/config.d
 COPY web /root/web
 
 COPY *.lua /root/
