@@ -228,7 +228,16 @@ local function web(req, resp)
     return resp:reply(404, "Not Found", "Not Found")
 end
 
+local function stats()
+    return {
+        file_cache = file_cache:stats(),
+        body_cache = body_cache:stats(),
+        gzip_cache = gzip_cache:stats(),
+    }
+end
+
 return {
     web = web,
-    reset_cache = reset_cache
+    reset_cache = reset_cache,
+    stats = stats,
 }
