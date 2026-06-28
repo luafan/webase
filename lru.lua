@@ -32,6 +32,11 @@ function lru.new(max_size, max_bytes)
 
     local removed_tuple -- created in del(), removed in set()
 
+    -- stats
+    local hits = 0
+    local misses = 0
+    local evictions = 0
+
     -- remove a tuple from linked list
     local function cut(tuple)
         local tuple_prev = tuple[PREV]
@@ -83,6 +88,7 @@ function lru.new(max_size, max_bytes)
             (max_bytes and bytes_used + bytes > max_bytes)
         do
             assert(oldest, "not enough storage for cache")
+            evictions = evictions + 1
             del(oldest[KEY], oldest)
         end
     end
@@ -90,8 +96,10 @@ function lru.new(max_size, max_bytes)
     local function get(_, key)
         local tuple = map[key]
         if not tuple then
+            misses = misses + 1
             return nil
         end
+        hits = hits + 1
         cut(tuple)
         setNewest(tuple)
         return tuple[VALUE]
@@ -104,13 +112,13 @@ function lru.new(max_size, max_bytes)
         end
         if value ~= nil then
             -- the value is not removed
-            bytes = max_bytes and (bytes or #value) or 0
+            bytes = bytes or 0
             makeFreeSpace(bytes)
             local tuple1 = removed_tuple or {}
             map[key] = tuple1
             tuple1[VALUE] = value
             tuple1[KEY] = key
-            tuple1[BYTES] = max_bytes and bytes
+            tuple1[BYTES] = bytes
             size = size + 1
             bytes_used = bytes_used + bytes
             setNewest(tuple1)
@@ -143,12 +151,40 @@ function lru.new(max_size, max_bytes)
         return mynext, nil, nil
     end
 
+    local function stats()
+        return {
+            size = size,
+            max_size = max_size,
+            bytes_used = bytes_used,
+            max_bytes = max_bytes,
+            hits = hits,
+            misses = misses,
+            evictions = evictions,
+        }
+    end
+
+    local function update_bytes(_, key, delta)
+        local tuple = map[key]
+        if not tuple then return end
+        tuple[BYTES] = (tuple[BYTES] or 0) + delta
+        bytes_used = bytes_used + delta
+    end
+
+    local function reset_stats()
+        hits = 0
+        misses = 0
+        evictions = 0
+    end
+
     local mt = {
         __index = {
             get = get,
             set = set,
             delete = delete,
             pairs = lru_pairs,
+            stats = stats,
+            update_bytes = update_bytes,
+            reset_stats = reset_stats,
         },
         __pairs = lru_pairs,
     }
