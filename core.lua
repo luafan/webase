@@ -39,3 +39,11 @@ serv2 = httpd.bind{
 print(serv2.host, serv2.port)
 
 fan.loop()
+
+-- After event loop exits (triggered by event_mgr_break), run shutdown hooks
+-- to release resources (SQLite handles, etc.) before lua_close.
+if _SHUTDOWN_HOOKS then
+  for _, fn in ipairs(_SHUTDOWN_HOOKS) do
+    pcall(fn)
+  end
+end
