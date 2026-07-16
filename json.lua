@@ -75,6 +75,39 @@ local function encode_nil(val)
 end
 
 
+-- First useful Lua call site outside this module.
+-- Skips C frames (e.g. pcall) so we never report "[C]:-1".
+-- Prefers load() chunks (source starts with "="; short_src is often [string "name"]).
+-- Does NOT hardcode app module names — callers that pcall(json.encode) should
+-- attach their own identity (user/slug/unit) when the stack only shows wrappers.
+local function caller_site()
+  local self_src = debug.getinfo(1, "S").short_src
+  local fallback = nil
+  for level = 2, 32 do
+    local info = debug.getinfo(level, "Sl")
+    if not info then break end
+    if info.what ~= "C" and info.short_src ~= self_src then
+      local source = info.source or ""
+      local short = info.short_src or "?"
+      local line = info.currentline
+      local chunk_name = source:match("^%=(.+)$")
+      local label_src = chunk_name or short
+      local label
+      if line and line > 0 then
+        label = label_src .. ":" .. tostring(line)
+      else
+        label = label_src
+      end
+      if chunk_name and line and line > 0 then
+        return label
+      end
+      if not fallback then fallback = label end
+    end
+  end
+  return fallback or "?"
+end
+
+
 local function encode_table(val, stack)
   local res = {}
   stack = stack or {}
@@ -86,20 +119,11 @@ local function encode_table(val, stack)
   local mt = getmetatable(val)
 
   if rawget(val, 1) ~= nil or mt == table_array_mt or (mt ~= table_object_mt and next(val) == nil) then
-    -- Ambiguous empty table (no metatable, no entries) — throw with
-    -- the caller's trace so the user can locate the bare {}.
+    -- Ambiguous empty table (no metatable, no entries). Report caller site only —
+    -- full stack traces hide the reason and break when the outer frame is pcall.
     if mt ~= table_array_mt and mt ~= table_object_mt and next(val) == nil then
-      local site = "?"
-      local self_src = debug.getinfo(1, "S").short_src
-      for level = 2, 20 do
-        local info = debug.getinfo(level, "Sl")
-        if not info then break end
-        if info.short_src ~= self_src then
-          site = info.short_src .. ":" .. tostring(info.currentline)
-          break
-        end
-      end
-      error("ambiguous empty table at " .. site .. ": use json.array() for [] or json.object() for {}\n" .. debug.traceback("", 2), 0)
+      error("ambiguous empty table at " .. caller_site()
+        .. ": use json.array() for [] or json.object() for {}", 0)
     end
     -- Treat as array -- check keys are valid and it is not sparse
     local n = 0
@@ -219,7 +243,12 @@ local function decode_error(str, idx, msg)
       col_count = 1
     end
   end
-  error(string.format("%s at line %d col %d\n%s", msg, line_count, col_count, debug.traceback()))
+  -- JSON text position first; optional Lua call site (no full traceback noise).
+  local site = caller_site()
+  if site ~= "?" then
+    error(string.format("%s at line %d col %d (from %s)", msg, line_count, col_count, site), 0)
+  end
+  error(string.format("%s at line %d col %d", msg, line_count, col_count), 0)
 end
 
 
