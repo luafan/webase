@@ -461,4 +461,16 @@ function json.enable_null(enabled)
   end
 end
 
+-- True if v is present (not Lua nil / JSON null sentinel).
+-- Empty string "" is still valid here — use json.is_nonempty_string for non-empty text.
+function json.is_valid(v)
+  return v ~= nil and v ~= NULL_SENTINEL
+end
+
+-- True if v is a non-empty string (the usual API/id field check).
+-- False: nil, JSON null, non-string, or "".
+function json.is_nonempty_string(v)
+  return type(v) == "string" and v ~= ""
+end
+
 return json
