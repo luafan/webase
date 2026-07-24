@@ -1,5 +1,7 @@
 --
--- json.lua
+-- ljson.lua — pure-Lua JSON (rxi-based), kept as regression reference.
+-- Production path: require "json" → C module (luafan/src/json.c via package.preload).
+-- Compare with: require "ljson" (this file) for encode/decode parity tests.
 --
 -- Copyright (c) 2020 rxi
 --
@@ -462,8 +464,8 @@ function json.enable_null(enabled)
 end
 
 -- True if v is present (not Lua nil / JSON null sentinel).
--- Empty string "" is still valid here — use json.is_nonempty_string for non-empty text.
-function json.is_valid(v)
+-- Empty string "" still counts as present — use json.is_nonempty_string for non-empty text.
+function json.is_present(v)
   return v ~= nil and v ~= NULL_SENTINEL
 end
 
