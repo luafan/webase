@@ -39,7 +39,7 @@ local function load_config(dir)
 end
 
 if not _DATABASE_REGISTRY then
-    -- 仅非 bundle 模式扫目录; bundle 模式 mapping/ 为空无需扫
+    -- Scan mapping/ on disk when no in-memory database registry is set.
     load_config(mapping_dir)
 end
 

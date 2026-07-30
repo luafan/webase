@@ -97,7 +97,7 @@ local function register_handle(m)
 end
 
 if _HANDLE_REGISTRY then
-  -- 从 amalgamated bundle 加载 handle 模块 (字节码 + 独立 env)
+  -- Optional in-memory handle map; otherwise scan WORKDIR/handle on disk.
   for modname, bytecode in pairs(_HANDLE_REGISTRY) do
     local m = setmetatable({}, { __index = _G })
     local chunk, load_err = load(bytecode, "@" .. modname, "b", m)

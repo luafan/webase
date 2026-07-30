@@ -54,7 +54,7 @@ local function load_path(path)
 end
 
 if _SERVICE_REGISTRY then
-  -- 从 amalgamated bundle 加载 service 模块 (字节码 + 独立 env)
+  -- Optional in-memory service map; otherwise scan WORKDIR/service on disk.
   for modname, bytecode in pairs(_SERVICE_REGISTRY) do
     local m = setmetatable({}, { __index = _G })
     local chunk, load_err = load(bytecode, "@" .. modname, "b", m)
