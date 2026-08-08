@@ -1,3 +1,16 @@
+# ---- builder: compile curlimp.so (not committed; built in-image) ----
+# Start from the luafan base image so fan.so, libevent runtime and Lua 5.3
+# are already there — we only need to install gcc + libevent-dev + wget for
+# the build. The builder stage is discarded; only /out/* is copied below.
+FROM luafan/luafan-alpine AS curlimp-builder
+
+ARG TARGETARCH
+COPY curl-impersonate/ /tmp/curl-impersonate/
+RUN apk add --no-cache gcc musl-dev libevent-dev wget >/dev/null 2>&1 \
+    && sh /tmp/curl-impersonate/build.sh "$TARGETARCH" /out \
+    && rm -rf /tmp/curl-impersonate
+
+# ---- final webase image ----
 FROM luafan/luafan-alpine
 
 ENV MARIA_DATABASE_NAME=test
@@ -11,6 +24,13 @@ ENV HTTPD_USING_CORE=true
 ENV WEBROOT=/root/web
 
 RUN wget https://curl.haxx.se/ca/cacert.pem -O cert.pem
+
+# curl-impersonate (curlimp Lua module + libcurl-impersonate)
+ARG TARGETPLATFORM
+COPY --from=curlimp-builder /out/curlimp.so /usr/local/lib/lua/5.3/curlimp.so
+COPY --from=curlimp-builder /out/libcurl-impersonate.so.4.8.0 /usr/local/lib/
+COPY --from=curlimp-builder /out/libcurl-impersonate.so.4 /usr/local/lib/
+COPY --from=curlimp-builder /out/libcurl-impersonate.so /usr/local/lib/
 
 COPY config.d /root/config.d
 COPY web /root/web
