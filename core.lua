@@ -38,6 +38,13 @@ serv2 = httpd.bind{
 
 print(serv2.host, serv2.port)
 
+-- Initialize worker threads from SERVICE_WORKERS env (default 8)
+local worker_count = tonumber(os.getenv("SERVICE_WORKERS")) or 8
+if worker_count > 0 and fan.workers_init then
+  fan.workers_init(worker_count)
+  print("workers: " .. fan.worker_count())
+end
+
 fan.loop()
 
 -- After event loop exits (triggered by event_mgr_break), run shutdown hooks
