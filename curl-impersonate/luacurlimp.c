@@ -280,6 +280,7 @@ static int l_request(lua_State *L) {
     const char *body = NULL; size_t body_len = 0;
     long timeout = 30L;
     int default_headers = 1, ssl_verify = 1;
+    long low_speed_limit = 0L, low_speed_time = 0L;
 
     lua_getfield(L, 1, "url");    if (lua_isstring(L,-1)) url = lua_tostring(L,-1); lua_pop(L,1);
     if (!url) return luaL_error(L, "url is required");
@@ -289,6 +290,8 @@ static int l_request(lua_State *L) {
     lua_getfield(L, 1, "timeout");if (lua_isnumber(L,-1)) timeout = (long)lua_tonumber(L,-1); lua_pop(L,1);
     lua_getfield(L, 1, "default_headers"); if (lua_isboolean(L,-1)) default_headers = lua_toboolean(L,-1); lua_pop(L,1);
     lua_getfield(L, 1, "ssl_verify");      if (lua_isboolean(L,-1)) ssl_verify = lua_toboolean(L,-1); lua_pop(L,1);
+    lua_getfield(L, 1, "low_speed_limit"); if (lua_isnumber(L,-1)) low_speed_limit = (long)lua_tonumber(L,-1); lua_pop(L,1);
+    lua_getfield(L, 1, "low_speed_time");  if (lua_isnumber(L,-1)) low_speed_time = (long)lua_tonumber(L,-1); lua_pop(L,1);
 
     /* ---- init CURLM once ---- */
     if (!ci_multi) {
@@ -323,6 +326,12 @@ static int l_request(lua_State *L) {
     curl_easy_setopt(c->easy, CURLOPT_NOSIGNAL, 1L);
     curl_easy_setopt(c->easy, CURLOPT_SSL_VERIFYPEER, ssl_verify ? 1L : 0L);
     curl_easy_setopt(c->easy, CURLOPT_SSL_VERIFYHOST, ssl_verify ? 2L : 0L);
+    /* Abort transfer when throughput drops below low_speed_limit bytes/sec for
+     * low_speed_time seconds. libcurl requires BOTH to be > 0 to activate. */
+    if (low_speed_limit > 0 && low_speed_time > 0) {
+        curl_easy_setopt(c->easy, CURLOPT_LOW_SPEED_LIMIT, low_speed_limit);
+        curl_easy_setopt(c->easy, CURLOPT_LOW_SPEED_TIME, low_speed_time);
+    }
     curl_easy_setopt(c->easy, CURLOPT_ERRORBUFFER, c->error);
     curl_easy_setopt(c->easy, CURLOPT_PRIVATE, c);
     curl_easy_setopt(c->easy, CURLOPT_WRITEFUNCTION, write_cb);
