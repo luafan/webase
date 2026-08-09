@@ -118,9 +118,16 @@ static void ci_check_cb(int fd, short kind, void *ud);
 static void ci_complete(CI_Conn *c);
 static void ci_resume_cb(int fd, short kind, void *ud);
 
-/* timer from curl_multi: arm libevent timeout */
+/* timer from curl_multi: arm libevent timeout.
+ * timeout_ms < 0 means "delete the timer" (libcurl contract). */
 static int multi_timer_cb(CURLM *m, long timeout_ms, void *ud) {
     (void)m; (void)ud;
+    if (!ci_timeout_event)
+        return 0;
+    if (timeout_ms < 0) {
+        evtimer_del(ci_timeout_event);
+        return 0;
+    }
     struct timeval tv;
     tv.tv_sec  = timeout_ms / 1000;
     tv.tv_usec = (timeout_ms % 1000) * 1000;
@@ -324,7 +331,7 @@ static int l_request(lua_State *L) {
     curl_easy_setopt(c->easy, CURLOPT_HEADERDATA, c);
 
     if (body) {
-        curl_easy_setopt(c->easy, CURLOPT_POSTFIELDS, body);
+        curl_easy_setopt(c->easy, CURLOPT_COPYPOSTFIELDS, body);
         curl_easy_setopt(c->easy, CURLOPT_POSTFIELDSIZE_LARGE, (curl_off_t)body_len);
         if (strcmp(method, "GET") != 0 && strcmp(method, "POST") != 0)
             curl_easy_setopt(c->easy, CURLOPT_CUSTOMREQUEST, method);
@@ -355,6 +362,7 @@ static int l_request(lua_State *L) {
     CURLMcode mrc = curl_multi_add_handle(ci_multi, c->easy);
     if (mrc != CURLM_OK) {
         luaL_unref(c->mainthread, LUA_REGISTRYINDEX, c->coref);
+        if (c->headers) curl_slist_free_all(c->headers);
         curl_easy_cleanup(c->easy); free(c);
         return luaL_error(L, "curl_multi_add_handle: %s", curl_multi_strerror(mrc));
     }
@@ -363,6 +371,64 @@ static int l_request(lua_State *L) {
 
     /* yield; coroutine is resumed with (ok, resp) pushed by ci_complete */
     return lua_yield(L, 0);
+}
+
+/* ------------------------------------------------------------------ */
+/* Teardown (mirrors cleanup_http_curl in luafan http.c).
+ *
+ * Called from event_mgr while BOTH the event_base and the Lua state are
+ * still alive. Must run before event_base_free: otherwise ci_timeout_event
+ * stays pinned to a freed base and the next curl_multi_add_handle →
+ * multi_timer_cb → event_add UAF crashes in pthread_mutex_lock.
+ */
+void cleanup_curlimp(void) {
+    while (inflight_head) {
+        CI_Conn *c = inflight_head;
+        inflight_remove(c);
+
+        if (!c->completed) {
+            c->completed = 1;
+            /* Abort without resume — drop the yielded coroutine ref. */
+            if (c->mainthread && c->coref != LUA_NOREF) {
+                luaL_unref(c->mainthread, LUA_REGISTRYINDEX, c->coref);
+                c->coref = LUA_NOREF;
+            }
+        }
+
+        if (c->headers) {
+            curl_slist_free_all(c->headers);
+            c->headers = NULL;
+        }
+        free(c->body);
+        c->body = NULL;
+        c->body_len = 0;
+        free(c->hdrs);
+        c->hdrs = NULL;
+        c->hdrs_len = 0;
+
+        if (c->easy) {
+            if (ci_multi)
+                curl_multi_remove_handle(ci_multi, c->easy);
+            curl_easy_cleanup(c->easy);
+            c->easy = NULL;
+        }
+        free(c);
+    }
+
+    if (ci_multi) {
+        /* Socket/timer callbacks may run; base must still be valid. */
+        curl_multi_cleanup(ci_multi);
+        ci_multi = NULL;
+    }
+    if (ci_timeout_event) {
+        event_free(ci_timeout_event);
+        ci_timeout_event = NULL;
+    }
+    if (ci_check_event) {
+        event_free(ci_check_event);
+        ci_check_event = NULL;
+    }
+    ci_running = 0;
 }
 
 /* ------------------------------------------------------------------ */
