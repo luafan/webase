@@ -363,8 +363,17 @@ static int l_request(lua_State *L) {
     curl_easy_setopt(c->easy, CURLOPT_HEADERDATA, c);
 
     if (body) {
-        curl_easy_setopt(c->easy, CURLOPT_COPYPOSTFIELDS, body);
+        /* CURLOPT_POST=1 primes the upload state machine (read from POSTFIELDS
+         * buffer). Without it, CUSTOMREQUEST=PATCH/PUT under curl_easy_impersonate
+         * leaves libcurl expecting a read callback and fails with
+         * "client read function EOF fail, only 0/N of needed bytes read".
+         * CUSTOMREQUEST then rewrites just the request-line verb.
+         * COPYPOSTFIELDS must come AFTER POSTFIELDSIZE per libcurl docs when
+         * the body is binary or contains NULs; harmless when ordered this way
+         * for plain text too. */
+        curl_easy_setopt(c->easy, CURLOPT_POST, 1L);
         curl_easy_setopt(c->easy, CURLOPT_POSTFIELDSIZE_LARGE, (curl_off_t)body_len);
+        curl_easy_setopt(c->easy, CURLOPT_COPYPOSTFIELDS, body);
         if (strcmp(method, "GET") != 0 && strcmp(method, "POST") != 0)
             curl_easy_setopt(c->easy, CURLOPT_CUSTOMREQUEST, method);
     } else if (strcmp(method, "GET") != 0) {
