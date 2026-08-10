@@ -281,6 +281,10 @@ static int l_request(lua_State *L) {
     long timeout = 30L;
     int default_headers = 1, ssl_verify = 1;
     long low_speed_limit = 0L, low_speed_time = 0L;
+    const char *proxy = NULL;
+    long proxyport = 0;
+    const char *proxyuser = NULL, *proxypassword = NULL;
+    int proxytunnel = 0;
 
     lua_getfield(L, 1, "url");    if (lua_isstring(L,-1)) url = lua_tostring(L,-1); lua_pop(L,1);
     if (!url) return luaL_error(L, "url is required");
@@ -292,6 +296,11 @@ static int l_request(lua_State *L) {
     lua_getfield(L, 1, "ssl_verify");      if (lua_isboolean(L,-1)) ssl_verify = lua_toboolean(L,-1); lua_pop(L,1);
     lua_getfield(L, 1, "low_speed_limit"); if (lua_isnumber(L,-1)) low_speed_limit = (long)lua_tonumber(L,-1); lua_pop(L,1);
     lua_getfield(L, 1, "low_speed_time");  if (lua_isnumber(L,-1)) low_speed_time = (long)lua_tonumber(L,-1); lua_pop(L,1);
+    lua_getfield(L, 1, "proxy");         if (lua_isstring(L,-1)) proxy = lua_tostring(L,-1); lua_pop(L,1);
+    lua_getfield(L, 1, "proxyport");     if (lua_isnumber(L,-1)) proxyport = (long)lua_tonumber(L,-1); lua_pop(L,1);
+    lua_getfield(L, 1, "proxyuser");     if (lua_isstring(L,-1)) proxyuser = lua_tostring(L,-1); lua_pop(L,1);
+    lua_getfield(L, 1, "proxypassword"); if (lua_isstring(L,-1)) proxypassword = lua_tostring(L,-1); lua_pop(L,1);
+    lua_getfield(L, 1, "proxytunnel");   if (lua_isboolean(L,-1)) proxytunnel = lua_toboolean(L,-1); lua_pop(L,1);
 
     /* ---- init CURLM once ---- */
     if (!ci_multi) {
@@ -326,6 +335,20 @@ static int l_request(lua_State *L) {
     curl_easy_setopt(c->easy, CURLOPT_NOSIGNAL, 1L);
     curl_easy_setopt(c->easy, CURLOPT_SSL_VERIFYPEER, ssl_verify ? 1L : 0L);
     curl_easy_setopt(c->easy, CURLOPT_SSL_VERIFYHOST, ssl_verify ? 2L : 0L);
+    /* Proxy: proxy alone accepts full URL (http://user:pass@host:port);
+     * proxyport/proxyuser/proxypassword are optional overrides for host-only form.
+     * proxytunnel=true forces CONNECT tunneling (required for HTTPS through HTTP proxy). */
+    if (proxy) {
+        curl_easy_setopt(c->easy, CURLOPT_PROXY, proxy);
+        if (proxyport > 0)
+            curl_easy_setopt(c->easy, CURLOPT_PROXYPORT, proxyport);
+        if (proxyuser)
+            curl_easy_setopt(c->easy, CURLOPT_PROXYUSERNAME, proxyuser);
+        if (proxypassword)
+            curl_easy_setopt(c->easy, CURLOPT_PROXYPASSWORD, proxypassword);
+        if (proxytunnel)
+            curl_easy_setopt(c->easy, CURLOPT_HTTPPROXYTUNNEL, 1L);
+    }
     /* Abort transfer when throughput drops below low_speed_limit bytes/sec for
      * low_speed_time seconds. libcurl requires BOTH to be > 0 to activate. */
     if (low_speed_limit > 0 && low_speed_time > 0) {
