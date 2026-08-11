@@ -25,12 +25,12 @@ ENV WEBROOT=/root/web
 
 RUN wget https://curl.haxx.se/ca/cacert.pem -O cert.pem
 
-# curl-impersonate (curlimp Lua module + libcurl-impersonate)
+# curl-impersonate (curlimp Lua module + libcurl-impersonate).
+# build.sh lays /out/ out as {lib/, lib/lua/5.3/}; a single directory COPY
+# preserves the two soname symlinks (individual file COPYs would each
+# dereference libcurl-impersonate.so and duplicate the 30MB blob).
 ARG TARGETPLATFORM
-COPY --from=curlimp-builder /out/curlimp.so /usr/local/lib/lua/5.3/curlimp.so
-COPY --from=curlimp-builder /out/libcurl-impersonate.so.4.8.0 /usr/local/lib/
-COPY --from=curlimp-builder /out/libcurl-impersonate.so.4 /usr/local/lib/
-COPY --from=curlimp-builder /out/libcurl-impersonate.so /usr/local/lib/
+COPY --from=curlimp-builder /out/ /usr/local/
 
 COPY config.d /root/config.d
 COPY web /root/web
