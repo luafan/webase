@@ -14,6 +14,14 @@ on:
           - both
           - ubuntu
           - alpine
+  # Fired by luafan/luafan docker-push workflow after it publishes a new
+  # base image (luafan/luafan-ubuntu or luafan/luafan-alpine). Each event
+  # rebuilds only the matching variant, so ubuntu and alpine stay
+  # independent.
+  repository_dispatch:
+    types:
+      - luafan-ubuntu-updated
+      - luafan-alpine-updated
 
 # Multi-arch build strategy:
 #   1. Per-arch job runs on a NATIVE runner (ubuntu-22.04 for amd64,
@@ -30,7 +38,8 @@ jobs:
   build-ubuntu:
     if: |
       github.event_name == 'push' ||
-      github.event_name == 'workflow_dispatch' && (inputs.target == 'both' || inputs.target == 'ubuntu')
+      github.event_name == 'workflow_dispatch' && (inputs.target == 'both' || inputs.target == 'ubuntu') ||
+      github.event_name == 'repository_dispatch' && github.event.action == 'luafan-ubuntu-updated'
     strategy:
       fail-fast: false
       matrix:
@@ -116,7 +125,8 @@ jobs:
   build-alpine:
     if: |
       github.event_name == 'push' ||
-      github.event_name == 'workflow_dispatch' && (inputs.target == 'both' || inputs.target == 'alpine')
+      github.event_name == 'workflow_dispatch' && (inputs.target == 'both' || inputs.target == 'alpine') ||
+      github.event_name == 'repository_dispatch' && github.event.action == 'luafan-alpine-updated'
     strategy:
       fail-fast: false
       matrix:
