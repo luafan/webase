@@ -15,19 +15,36 @@ on:
           - ubuntu
           - alpine
 
+# Multi-arch build strategy:
+#   1. Per-arch job runs on a NATIVE runner (ubuntu-22.04 for amd64,
+#      ubuntu-22.04-arm for arm64) and pushes an image-by-digest to Docker Hub.
+#   2. A merge job pulls the two digests and joins them into a single
+#      multi-arch manifest under the real tags (latest, <sha>).
+#   Replaces single-job QEMU cross-build which was ~5-10x slower on the
+#   arm64 leg.
+#
+# Reference: https://docs.docker.com/build/ci/github-actions/multi-platform/
+
 jobs:
-  push-ubuntu:
-    runs-on: ubuntu-22.04
+  # ---------------- Ubuntu (image: luafan/webase) ----------------
+  build-ubuntu:
     if: |
       github.event_name == 'push' ||
       github.event_name == 'workflow_dispatch' && (inputs.target == 'both' || inputs.target == 'ubuntu')
-
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-22.04
+            arch: amd64
+          - platform: linux/arm64
+            runner: ubuntu-22.04-arm
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
     steps:
     - name: Checkout code
       uses: actions/checkout@v6
-
-    - name: Set up QEMU
-      uses: docker/setup-qemu-action@v3
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
@@ -38,29 +55,41 @@ jobs:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-    - name: Build and push Ubuntu image
+    - name: Build and push by digest
+      id: build
       uses: docker/build-push-action@v6
       with:
         context: .
         file: Dockerfile
-        platforms: linux/amd64,linux/arm64
-        push: true
-        tags: |
-          luafan/webase:latest
-          luafan/webase:${{ github.sha }}
+        platforms: ${{ matrix.platform }}
+        outputs: type=image,name=luafan/webase,push-by-digest=true,name-canonical=true,push=true
+        cache-from: type=gha,scope=webase-ubuntu-${{ matrix.arch }}
+        cache-to: type=gha,mode=max,scope=webase-ubuntu-${{ matrix.arch }}
 
-  push-alpine:
+    - name: Export digest
+      run: |
+        mkdir -p /tmp/digests
+        digest="${{ steps.build.outputs.digest }}"
+        touch "/tmp/digests/${digest#sha256:}"
+
+    - name: Upload digest
+      uses: actions/upload-artifact@v4
+      with:
+        name: digests-webase-ubuntu-${{ matrix.arch }}
+        path: /tmp/digests/*
+        if-no-files-found: error
+        retention-days: 1
+
+  merge-ubuntu:
+    needs: [build-ubuntu]
     runs-on: ubuntu-22.04
-    if: |
-      github.event_name == 'push' ||
-      github.event_name == 'workflow_dispatch' && (inputs.target == 'both' || inputs.target == 'alpine')
-
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v6
-
-    - name: Set up QEMU
-      uses: docker/setup-qemu-action@v3
+    - name: Download digests
+      uses: actions/download-artifact@v4
+      with:
+        path: /tmp/digests
+        pattern: digests-webase-ubuntu-*
+        merge-multiple: true
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
@@ -71,13 +100,100 @@ jobs:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-    - name: Build and push Alpine image
+    - name: Create manifest and push
+      working-directory: /tmp/digests
+      run: |
+        docker buildx imagetools create \
+          -t luafan/webase:latest \
+          -t luafan/webase:${{ github.sha }} \
+          $(printf 'luafan/webase@sha256:%s ' *)
+
+    - name: Inspect image
+      run: |
+        docker buildx imagetools inspect luafan/webase:latest
+
+  # ---------------- Alpine (image: luafan/webase-alpine) ----------------
+  build-alpine:
+    if: |
+      github.event_name == 'push' ||
+      github.event_name == 'workflow_dispatch' && (inputs.target == 'both' || inputs.target == 'alpine')
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-22.04
+            arch: amd64
+          - platform: linux/arm64
+            runner: ubuntu-22.04-arm
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v6
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Login to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+    - name: Build and push by digest
+      id: build
       uses: docker/build-push-action@v6
       with:
         context: .
         file: Dockerfile.alpine
-        platforms: linux/amd64,linux/arm64
-        push: true
-        tags: |
-          luafan/webase-alpine:latest
-          luafan/webase-alpine:${{ github.sha }}
+        platforms: ${{ matrix.platform }}
+        outputs: type=image,name=luafan/webase-alpine,push-by-digest=true,name-canonical=true,push=true
+        cache-from: type=gha,scope=webase-alpine-${{ matrix.arch }}
+        cache-to: type=gha,mode=max,scope=webase-alpine-${{ matrix.arch }}
+
+    - name: Export digest
+      run: |
+        mkdir -p /tmp/digests
+        digest="${{ steps.build.outputs.digest }}"
+        touch "/tmp/digests/${digest#sha256:}"
+
+    - name: Upload digest
+      uses: actions/upload-artifact@v4
+      with:
+        name: digests-webase-alpine-${{ matrix.arch }}
+        path: /tmp/digests/*
+        if-no-files-found: error
+        retention-days: 1
+
+  merge-alpine:
+    needs: [build-alpine]
+    runs-on: ubuntu-22.04
+    steps:
+    - name: Download digests
+      uses: actions/download-artifact@v4
+      with:
+        path: /tmp/digests
+        pattern: digests-webase-alpine-*
+        merge-multiple: true
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Login to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+    - name: Create manifest and push
+      working-directory: /tmp/digests
+      run: |
+        docker buildx imagetools create \
+          -t luafan/webase-alpine:latest \
+          -t luafan/webase-alpine:${{ github.sha }} \
+          $(printf 'luafan/webase-alpine@sha256:%s ' *)
+
+    - name: Inspect image
+      run: |
+        docker buildx imagetools inspect luafan/webase-alpine:latest
