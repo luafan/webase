@@ -20,6 +20,12 @@ ENV MARIA_DATABASE_NAME=test
 ENV SERVICE_HOST=0.0.0.0
 ENV SERVICE_PORT=2201
 
+# Worker threads. 0 = single-threaded event loop (safe with any Lua build).
+# Multi-worker (>0) REQUIRES a Lua built with the global lua_lock hook
+# (LUA_USER_H=fan_lua_lock.h); otherwise concurrent worker threads race on the
+# shared lua_State. Keep 0 until the base image ships the locked Lua.
+ENV SERVICE_WORKERS=0
+
 ENV HTTP_USING_CORE=true
 ENV HTTPD_USING_CORE=true
 
