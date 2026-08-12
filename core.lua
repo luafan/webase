@@ -36,6 +36,17 @@ serv2 = httpd.bind{
   onService = onService
 }
 
+if not serv2 then
+  -- httpd.bind returns nil on evhttp_bind_socket_with_handle failure
+  -- (port already in use, permission denied, invalid host, etc.).
+  -- Raise a human-readable error so the native host (LuaBridge) can
+  -- surface it to the UI as .failed(msg) instead of a cryptic
+  -- "attempt to index a nil value (global 'serv2')".
+  error(string.format(
+    "httpd.bind failed: cannot bind %s:%s (port in use or permission denied)",
+    tostring(config.service_host), tostring(config.service_port)), 0)
+end
+
 print(serv2.host, serv2.port)
 
 -- Initialize worker threads from SERVICE_WORKERS env (default 8)
