@@ -18,9 +18,9 @@
 #   lib/lua/5.3/curlimp.so         (Lua module,
 #                                   NEEDED: libcurl-impersonate.so.4, fan.so,
 #                                           libevent-2.1.so.7)
-#   lib/libcurl-impersonate.so.4.8.0 (prebuilt lib)
-#   lib/libcurl-impersonate.so.4  -> ...4.8.0 (soname symlink)
-#   lib/libcurl-impersonate.so    -> ...4.8.0 (generic symlink)
+#   lib/libcurl-impersonate.so.* (prebuilt lib)
+#   lib/libcurl-impersonate.so.4  -> prebuilt lib (soname symlink)
+#   lib/libcurl-impersonate.so    -> prebuilt lib (generic symlink)
 #
 # Usage:
 #   sh build.sh <TARGETARCH|amd64|arm64> <outdir>
@@ -55,7 +55,7 @@ fi
 echo ">> curlimp build: arch=$ARCH libc=$LIBC"
 
 # ---- 1. prebuilt libcurl-impersonate (has include/curl/curl.h) ----
-VERSION="v2.0.0"
+VERSION="v2.1.0"
 BASE="https://github.com/lexiforest/curl-impersonate/releases/download/${VERSION}"
 PKG="libcurl-impersonate-${VERSION}.${ARCH}-linux-${LIBC}.tar.gz"
 
@@ -74,9 +74,9 @@ LUAINC="/tmp/lua-5.3.6/src"
 
 # ---- 3. compile curlimp.so ----
 # Link against:
-#   libcurl-impersonate.so.4.8.0 (own SONAME, independent from system libcurl)
-#   fan.so                        (event_mgr_base / utlua_mainthread / FAN_RESUME)
-#   libevent                      (curl_multi socket/timer plumbing)
+#   libcurl-impersonate.so.* (own SONAME, independent from system libcurl)
+#   fan.so                    (event_mgr_base / utlua_mainthread / FAN_RESUME)
+#   libevent                  (curl_multi socket/timer plumbing)
 # rpath pinned to /usr/local/lib and /usr/local/lib/lua/5.3 so the module
 # never picks up another libcurl and always finds fan.so at runtime.
 #
@@ -90,19 +90,25 @@ if [ ! -f "$FAN_SO_DIR/fan.so" ]; then
   echo "!! fan.so not found at $FAN_SO_DIR — must build inside a luafan base image" >&2
   exit 1
 fi
+CURLIMP_LIB="$(find /tmp/ci -maxdepth 1 -type f -name 'libcurl-impersonate.so.*' | sort | tail -n 1)"
+if [ -z "$CURLIMP_LIB" ]; then
+  echo "!! libcurl-impersonate.so.* not found in release archive" >&2
+  exit 1
+fi
+CURLIMP_LIB_BASENAME="$(basename "$CURLIMP_LIB")"
 mkdir -p "$OUT/lib/lua/5.3"
 gcc -shared -fPIC -O2 \
     -I"$LUAINC" -I/tmp/ci/include \
     -o "$OUT/lib/lua/5.3/curlimp.so" "$SRC_DIR/luacurlimp.c" \
-    -L/tmp/ci -l:libcurl-impersonate.so.4.8.0 \
+    -L/tmp/ci -l:"$CURLIMP_LIB_BASENAME" \
     -L"$FAN_SO_DIR" -l:fan.so \
     -levent \
     -Wl,-rpath,/usr/local/lib:/usr/local/lib/lua/5.3
 
 # ---- 4. install prebuilt lib + soname links into out dir ----
-cp -f /tmp/ci/libcurl-impersonate.so.4.8.0 "$OUT/lib/"
-ln -sf libcurl-impersonate.so.4.8.0 "$OUT/lib/libcurl-impersonate.so.4"
-ln -sf libcurl-impersonate.so.4.8.0 "$OUT/lib/libcurl-impersonate.so"
+cp -f "$CURLIMP_LIB" "$OUT/lib/"
+ln -sf "$CURLIMP_LIB_BASENAME" "$OUT/lib/libcurl-impersonate.so.4"
+ln -sf "$CURLIMP_LIB_BASENAME" "$OUT/lib/libcurl-impersonate.so"
 
 rm -rf /tmp/ci /tmp/ci.tar.gz /tmp/lua.tar.gz
 echo ">> built:"

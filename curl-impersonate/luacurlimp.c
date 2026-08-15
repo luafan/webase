@@ -8,7 +8,7 @@
  *
  * Usage (inside fan.loop / webase):
  *   local ci = require("curlimp")
- *   local ok, resp = ci.request{ url="https://...", target="chrome146", timeout=30 }
+ *   local ok, resp = ci.request{ url="https://...", target="chrome150", timeout=30 }
  *   -- resp.status / resp.headers / resp.body / resp.error
  *
  * Requires: fan (luafan) loaded first, so event_mgr_base() / FAN_RESUME
@@ -276,7 +276,7 @@ static void ci_complete(CI_Conn *c) {
 static int l_request(lua_State *L) {
     luaL_checktype(L, 1, LUA_TTABLE);
 
-    const char *url = NULL, *method = "GET", *target = "chrome146";
+    const char *url = NULL, *method = "GET", *target = "chrome150";
     const char *body = NULL; size_t body_len = 0;
     long timeout = 30L;
     int default_headers = 1, ssl_verify = 1;
@@ -333,6 +333,9 @@ static int l_request(lua_State *L) {
     curl_easy_setopt(c->easy, CURLOPT_MAXREDIRS, 5L);
     curl_easy_setopt(c->easy, CURLOPT_TIMEOUT, timeout);
     curl_easy_setopt(c->easy, CURLOPT_NOSIGNAL, 1L);
+    /* Ask libcurl for all built-in encodings and transparently decode gzip,
+     * deflate, br, zstd, etc. according to the linked libcurl build. */
+    curl_easy_setopt(c->easy, CURLOPT_ACCEPT_ENCODING, "");
     curl_easy_setopt(c->easy, CURLOPT_SSL_VERIFYPEER, ssl_verify ? 1L : 0L);
     curl_easy_setopt(c->easy, CURLOPT_SSL_VERIFYHOST, ssl_verify ? 2L : 0L);
     /* Proxy: proxy alone accepts full URL (http://user:pass@host:port);
