@@ -71,6 +71,7 @@ static int lgcm_encrypt(lua_State *L) {
 
     int ok = 1;
     int outlen = 0;
+    int ct_pushed = 0;
 
     /* init */
     if (ok && EVP_EncryptInit_ex(ctx, cipher, NULL, NULL, NULL) != 1) ok = 0;
@@ -89,6 +90,7 @@ static int lgcm_encrypt(lua_State *L) {
     int ct_len = 0;
     if (ok) {
         ct = (unsigned char *)lua_newuserdata(L, pt_len + 16); /* +16 for safety */
+        ct_pushed = 1;
         if (EVP_EncryptUpdate(ctx, ct, &outlen, pt, (int)pt_len) != 1) {
             ok = 0;
         } else {
@@ -118,7 +120,7 @@ static int lgcm_encrypt(lua_State *L) {
     EVP_CIPHER_CTX_free(ctx);
 
     if (!ok) {
-        lua_pop(L, 1); /* remove userdata if pushed */
+        if (ct_pushed) lua_pop(L, 1);
         return luaL_error(L, "GCM encryption failed");
     }
 
@@ -162,6 +164,7 @@ static int lgcm_decrypt(lua_State *L) {
 
     int ok = 1;
     int outlen = 0;
+    int pt_pushed = 0;
 
     /* init */
     if (ok && EVP_DecryptInit_ex(ctx, cipher, NULL, NULL, NULL) != 1) ok = 0;
@@ -178,6 +181,7 @@ static int lgcm_decrypt(lua_State *L) {
     int pt_len = 0;
     if (ok) {
         pt = (unsigned char *)lua_newuserdata(L, ct_len + 16);
+        pt_pushed = 1;
         if (EVP_DecryptUpdate(ctx, pt, &outlen, ct, (int)ct_len) != 1) {
             ok = 0;
         } else {
@@ -208,13 +212,13 @@ static int lgcm_decrypt(lua_State *L) {
     EVP_CIPHER_CTX_free(ctx);
 
     if (!ok) {
-        lua_pop(L, 1); /* remove userdata */
+        if (pt_pushed) lua_pop(L, 1);
         return luaL_error(L, "GCM decryption failed (internal error)");
     }
 
     if (!verified) {
         /* tag mismatch — return nil (not an error) */
-        lua_pop(L, 1); /* remove userdata */
+        if (pt_pushed) lua_pop(L, 1);
         lua_pushnil(L);
         return 1;
     }
