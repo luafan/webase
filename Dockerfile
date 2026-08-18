@@ -2,11 +2,12 @@
 # Links only against libcrypto (already in base image); needs gcc + libssl-dev.
 FROM luafan/luafan-ubuntu AS gcm-builder
 
+ARG TARGETARCH
 COPY gcm/ /tmp/gcm/
 RUN apt-get update -qq \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
         gcc libssl-dev wget ca-certificates >/dev/null 2>&1 \
-    && sh /tmp/gcm/build.sh /gcm-out \
+    && sh /tmp/gcm/build.sh "$TARGETARCH" /gcm-out \
     && rm -rf /tmp/gcm /var/lib/apt/lists/*
 
 # ---- builder: compile curlimp.so (not committed; built in-image) ----
