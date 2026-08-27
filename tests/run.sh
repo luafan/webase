@@ -26,8 +26,8 @@ cleanup() {
 
 trap cleanup EXIT
 
-echo "=== Building Docker Image ==="
-docker build --network=host -t "$IMAGE_NAME" "$PROJECT_DIR"
+DOCKERFILE_PATH="$PROJECT_DIR/${1:-Dockerfile}"
+docker build --network=host -f "$DOCKERFILE_PATH" -t "$IMAGE_NAME" "$PROJECT_DIR"
 echo "  Image built: $IMAGE_NAME"
 
 echo ""
