@@ -22,6 +22,15 @@ print(service.start())
 
 math.randomseed(utils.gettime())
 
+-- Initialize worker threads before binding HTTP. HTTP/TCP/UDP services need
+-- the worker bases to exist during bind/connection setup; binding first makes
+-- the worker pool unavailable to the HTTP server.
+local worker_count = tonumber(os.getenv("SERVICE_WORKERS")) or 8
+if worker_count > 0 and fan.workers_init then
+  fan.workers_init(worker_count)
+  print("workers: " .. fan.worker_count())
+end
+
 function onService(req,resp)
   req.path = mapping[req.path] or req.path
 
@@ -48,13 +57,6 @@ if not serv2 then
 end
 
 print(serv2.host, serv2.port)
-
--- Initialize worker threads from SERVICE_WORKERS env (default 8)
-local worker_count = tonumber(os.getenv("SERVICE_WORKERS")) or 8
-if worker_count > 0 and fan.workers_init then
-  fan.workers_init(worker_count)
-  print("workers: " .. fan.worker_count())
-end
 
 fan.loop()
 
